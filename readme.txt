@@ -1,4 +1,4 @@
-=== Custom Permalinks ===
+=== Custom Permalinks with dedicated table ===
 Contributors: sasiddiqui
 Tags: permalink, url, link, address, custom, redirect, custom post type, GDPR, GDPR Compliant
 Tested up to: 6.0

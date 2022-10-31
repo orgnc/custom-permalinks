@@ -13,6 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Post Types Permalinks table class.
  */
 final class Custom_Permalinks_Post_Types {
+	/** @var Custom_Permalinks_Model */
+	private static $custom_permalinks_model;
+
 	/**
 	 * Returns the count of records in the database.
 	 *
@@ -26,10 +29,11 @@ final class Custom_Permalinks_Post_Types {
 
 		$total_posts = wp_cache_get( 'total_posts_result', 'custom_permalinks' );
 		if ( ! $total_posts ) {
+			$table_name = self::get_custom_permalinks_model()->table_name;
 			$sql_query = "
 				SELECT COUNT(p.ID) FROM $wpdb->posts AS p
-				LEFT JOIN $wpdb->postmeta AS pm ON (p.ID = pm.post_id)
-				WHERE pm.meta_key = 'custom_permalink' AND pm.meta_value != ''
+				LEFT JOIN $table_name AS pm ON (p.ID = pm.post_id)
+				WHERE pm.meta_value != ''
 			";
 
 			// phpcs:disable WordPress.Security.NonceVerification.Recommended
@@ -39,22 +43,14 @@ final class Custom_Permalinks_Post_Types {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 				$total_posts = $wpdb->get_var(
 					$wpdb->prepare(
-						"SELECT COUNT(p.ID) FROM {$wpdb->posts} AS p
-							LEFT JOIN {$wpdb->postmeta} AS pm ON (p.ID = pm.post_id)
-							WHERE pm.meta_key = 'custom_permalink'
-								AND pm.meta_value != ''
-								AND pm.meta_value LIKE %s",
+						"$sql_query AND pm.meta_value LIKE %s",
 						'%' . $wpdb->esc_like( $search_value ) . '%'
 					)
 				);
 				// phpcs:enable WordPress.Security.NonceVerification.Recommended
 			} else {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-				$total_posts = $wpdb->get_var(
-					"SELECT COUNT(p.ID) FROM {$wpdb->posts} AS p
-						LEFT JOIN {$wpdb->postmeta} AS pm ON (p.ID = pm.post_id)
-						WHERE pm.meta_key = 'custom_permalink' AND pm.meta_value != ''"
-				);
+				$total_posts = $wpdb->get_var($sql_query);
 			}
 
 			wp_cache_set( 'total_posts_result', $total_posts, 'custom_permalinks' );
@@ -76,6 +72,7 @@ final class Custom_Permalinks_Post_Types {
 	 */
 	public static function get_permalinks( $per_page = 20, $page_number = 1 ) {
 		global $wpdb;
+		$table_name = self::get_custom_permalinks_model()->table_name;
 
 		$posts = wp_cache_get( 'post_type_results', 'custom_permalinks' );
 		if ( ! $posts ) {
@@ -118,11 +115,10 @@ final class Custom_Permalinks_Post_Types {
 					$wpdb->prepare(
 						"SELECT p.ID, p.post_title, p.post_type, pm.meta_value
 							FROM {$wpdb->posts} AS p
-						LEFT JOIN {$wpdb->postmeta} AS pm ON (p.ID = pm.post_id)
-						WHERE pm.meta_key = 'custom_permalink'
-							AND pm.meta_value != ''
-							AND pm.meta_value LIKE %s
-						ORDER BY %s %s LIMIT %d, %d",
+							LEFT JOIN $table_name AS pm ON (p.ID = pm.post_id)
+							WHERE pm.meta_value != ''
+								AND pm.meta_value LIKE %s
+							ORDER BY %s %s LIMIT %d, %d",
 						'%' . $wpdb->esc_like( $search_value ) . '%',
 						$order_by,
 						$order,
@@ -137,9 +133,9 @@ final class Custom_Permalinks_Post_Types {
 					$wpdb->prepare(
 						"SELECT p.ID, p.post_title, p.post_type, pm.meta_value
 							FROM {$wpdb->posts} AS p
-						LEFT JOIN {$wpdb->postmeta} AS pm ON (p.ID = pm.post_id)
-						WHERE pm.meta_key = 'custom_permalink' AND pm.meta_value != ''
-						ORDER BY %s %s LIMIT %d, %d",
+							LEFT JOIN $table_name AS pm ON (p.ID = pm.post_id)
+							WHERE pm.meta_value != ''
+							ORDER BY %s %s LIMIT %d, %d",
 						$order_by,
 						$order,
 						$page_offset,
@@ -154,5 +150,13 @@ final class Custom_Permalinks_Post_Types {
 		}
 
 		return $posts;
+	}
+
+	private static function get_custom_permalinks_model() {
+		if ( self::$custom_permalinks_model === null ) {
+			self::$custom_permalinks_model = new Custom_Permalinks_Model();
+		}
+
+		return self::$custom_permalinks_model;
 	}
 }
