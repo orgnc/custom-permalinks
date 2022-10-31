@@ -17,6 +17,8 @@ if ( ! class_exists( 'WP_List_Table' ) ) {
  * Post Types Permalinks table class.
  */
 final class Custom_Permalinks_Post_Types_Table extends WP_List_Table {
+	/** @var Custom_Permalinks_Model */
+	private $custom_permalinks_model;
 	/**
 	 * Singleton instance variable
 	 *
@@ -41,6 +43,7 @@ final class Custom_Permalinks_Post_Types_Table extends WP_List_Table {
 
 		// Handle screen options.
 		$this->screen_options();
+		$this->custom_permalinks_model = new Custom_Permalinks_Model();
 	}
 
 	/**
@@ -382,10 +385,14 @@ final class Custom_Permalinks_Post_Types_Table extends WP_List_Table {
 					&& is_array( $del_permalinks )
 					&& 0 < count( $del_permalinks )
 				) {
-					$cp_form = new Custom_Permalinks_Form();
 					foreach ( $del_permalinks as $post_id ) {
 						if ( is_numeric( $post_id ) ) {
-							$cp_form->delete_permalink( $post_id );
+							if ( defined('CUSTOM_PERMALINKS_FORK_ENABLED') && CUSTOM_PERMALINKS_FORK_ENABLED ) {
+								$this->custom_permalinks_model->delete_permalink($post_id);
+							} else {
+								$cp_form = new Custom_Permalinks_Form();
+								$cp_form->delete_permalink( $post_id );
+							}
 							++$deleted;
 						}
 					}

@@ -13,6 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Class that shows permalink form on edit post/category and saves it.
  */
 class Custom_Permalinks_Form {
+	/** @var Custom_Permalinks_Model */
+	protected $custom_permalinks_model;
+
 	/**
 	 * JS file suffix extension.
 	 *
@@ -27,6 +30,10 @@ class Custom_Permalinks_Form {
 	 */
 	private $permalink_metabox = 0;
 
+	public function __construct() {
+		$this->custom_permalinks_model = new Custom_Permalinks_Model();
+	}
+
 	/**
 	 * Initialize WordPress Hooks.
 	 *
@@ -40,10 +47,17 @@ class Custom_Permalinks_Form {
 		 * JS file suffix (version number with extension).
 		 */
 		$this->js_file_suffix = '-' . CUSTOM_PERMALINKS_VERSION . '.min.js';
+		$this->custom_permalinks_model = new Custom_Permalinks_Model();
 
 		add_action( 'add_meta_boxes', array( $this, 'permalink_edit_box' ) );
 		add_action( 'save_post', array( $this, 'save_post' ), 10, 3 );
-		add_action( 'delete_post', array( $this, 'delete_permalink' ), 10 );
+
+		if ( defined('CUSTOM_PERMALINKS_FORK_ENABLED') && CUSTOM_PERMALINKS_FORK_ENABLED ) {
+			add_action( 'delete_post', array( $this->custom_permalinks_model, 'delete_permalink' ), 10 );
+		} else {
+			add_action( 'delete_post', array( $this, 'delete_permalink' ), 10 );
+		}
+
 		add_action( 'category_add_form', array( $this, 'term_options' ) );
 		add_action( 'category_edit_form', array( $this, 'term_options' ) );
 		add_action( 'post_tag_add_form', array( $this, 'term_options' ) );
@@ -400,11 +414,20 @@ class Custom_Permalinks_Form {
 				$post_id
 			);
 
-			update_post_meta( $post_id, 'custom_permalink', $permalink );
-			if ( null !== $language_code ) {
-				update_post_meta( $post_id, 'custom_permalink_language', $language_code );
+			if ( defined('CUSTOM_PERMALINKS_FORK_ENABLED') && CUSTOM_PERMALINKS_FORK_ENABLED ) {
+				$this->custom_permalinks_model->update_permalink( $post_id, $permalink );
+				if ( null !== $language_code ) {
+					$this->custom_permalinks_model->update_permalink( $post_id, $permalink, $language_code );
+				} else {
+					$this->custom_permalinks_model->delete_language_permalinks( $post_id );
+				}
 			} else {
-				delete_metadata( 'post', $post_id, 'custom_permalink_language' );
+				update_post_meta( $post_id, 'custom_permalink', $permalink );
+				if ( null !== $language_code ) {
+					update_post_meta( $post_id, 'custom_permalink_language', $language_code );
+				} else {
+					delete_metadata( 'post', $post_id, 'custom_permalink_language' );
+				}
 			}
 		}
 	}
@@ -435,7 +458,11 @@ class Custom_Permalinks_Form {
 	 */
 	private function get_permalink_html( $post, $meta_box = false ) {
 		$post_id   = $post->ID;
-		$permalink = get_post_meta( $post_id, 'custom_permalink', true );
+		if ( defined('CUSTOM_PERMALINKS_FORK_ENABLED') && CUSTOM_PERMALINKS_FORK_ENABLED ) {
+			$permalink = $this->custom_permalinks_model->get_permalink($post_id);
+		} else {
+			$permalink = get_post_meta( $post_id, 'custom_permalink', true );
+		}
 
 		ob_start();
 
@@ -888,11 +915,15 @@ class Custom_Permalinks_Form {
 		if ( isset( $data['id'] ) && is_numeric( $data['id'] ) ) {
 			$post                               = get_post( $data['id'] );
 			$all_permalinks                     = array();
-			$all_permalinks['custom_permalink'] = get_post_meta(
-				$data['id'],
-				'custom_permalink',
-				true
-			);
+			if ( defined('CUSTOM_PERMALINKS_FORK_ENABLED') && CUSTOM_PERMALINKS_FORK_ENABLED ) {
+				$all_permalinks['custom_permalink'] = $this->custom_permalinks_model->get_permalink($data['id']);
+			} else {
+				$all_permalinks['custom_permalink'] = get_post_meta(
+					$data['id'],
+					'custom_permalink',
+					true
+				);
+			}
 
 			if ( ! $all_permalinks['custom_permalink'] ) {
 				if ( 'draft' === $post->post_status
@@ -976,7 +1007,11 @@ class Custom_Permalinks_Form {
 	 */
 	public function static_homepage( $prev_homepage_id, $new_homepage_id ) {
 		if ( $prev_homepage_id !== $new_homepage_id ) {
-			$this->delete_permalink( $new_homepage_id );
+			if ( defined('CUSTOM_PERMALINKS_FORK_ENABLED') && CUSTOM_PERMALINKS_FORK_ENABLED ) {
+				$this->custom_permalinks_model->delete_permalink($new_homepage_id);
+			} else {
+				$this->delete_permalink( $new_homepage_id );
+			}
 		}
 	}
 }
