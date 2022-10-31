@@ -65,11 +65,16 @@ class Custom_Permalinks {
 	private function includes() {
 		include_once CUSTOM_PERMALINKS_PATH . 'includes/class-custom-permalinks-form.php';
 		include_once CUSTOM_PERMALINKS_PATH . 'includes/class-custom-permalinks-frontend.php';
+		include_once CUSTOM_PERMALINKS_PATH . 'includes/class-custom-permalinks-organic-model.php';
 		include_once CUSTOM_PERMALINKS_PATH . 'admin/class-custom-permalinks-admin.php';
 		include_once CUSTOM_PERMALINKS_PATH . 'admin/class-custom-permalinks-post-types.php';
 		include_once CUSTOM_PERMALINKS_PATH . 'admin/class-custom-permalinks-post-types-table.php';
 		include_once CUSTOM_PERMALINKS_PATH . 'admin/class-custom-permalinks-taxonomies.php';
 		include_once CUSTOM_PERMALINKS_PATH . 'admin/class-custom-permalinks-taxonomies-table.php';
+
+		$cp_model = new Custom_Permalinks_Model();
+		global $customPermalinksModel;
+		$customPermalinksModel = $cp_model;
 
 		$cp_form = new Custom_Permalinks_Form();
 		$cp_form->init();
