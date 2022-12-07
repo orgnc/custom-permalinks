@@ -387,7 +387,12 @@ final class Custom_Permalinks_Post_Types_Table extends WP_List_Table {
 				) {
 					foreach ( $del_permalinks as $post_id ) {
 						if ( is_numeric( $post_id ) ) {
-							$this->custom_permalinks_model->delete_permalink($post_id);
+							if ( defined('CUSTOM_PERMALINKS_FORK_ENABLED') && CUSTOM_PERMALINKS_FORK_ENABLED ) {
+								$this->custom_permalinks_model->delete_permalink($post_id);
+							} else {
+								$cp_form = new Custom_Permalinks_Form();
+								$cp_form->delete_permalink( $post_id );
+							}
 							++$deleted;
 						}
 					}

@@ -51,7 +51,13 @@ class Custom_Permalinks_Form {
 
 		add_action( 'add_meta_boxes', array( $this, 'permalink_edit_box' ) );
 		add_action( 'save_post', array( $this, 'save_post' ), 10, 3 );
-		add_action( 'delete_post', array( $this->custom_permalinks_model, 'delete_permalink' ), 10 );
+
+		if ( defined('CUSTOM_PERMALINKS_FORK_ENABLED') && CUSTOM_PERMALINKS_FORK_ENABLED ) {
+			add_action( 'delete_post', array( $this->custom_permalinks_model, 'delete_permalink' ), 10 );
+		} else {
+			add_action( 'delete_post', array( $this, 'delete_permalink' ), 10 );
+		}
+
 		add_action( 'category_add_form', array( $this, 'term_options' ) );
 		add_action( 'category_edit_form', array( $this, 'term_options' ) );
 		add_action( 'post_tag_add_form', array( $this, 'term_options' ) );
@@ -408,13 +414,35 @@ class Custom_Permalinks_Form {
 				$post_id
 			);
 
-			$this->custom_permalinks_model->update_permalink( $post_id, $permalink );
-			if ( null !== $language_code ) {
-				$this->custom_permalinks_model->update_permalink( $post_id, $permalink, $language_code );
+			if ( defined('CUSTOM_PERMALINKS_FORK_ENABLED') && CUSTOM_PERMALINKS_FORK_ENABLED ) {
+				$this->custom_permalinks_model->update_permalink( $post_id, $permalink );
+				if ( null !== $language_code ) {
+					$this->custom_permalinks_model->update_permalink( $post_id, $permalink, $language_code );
+				} else {
+					$this->custom_permalinks_model->delete_language_permalinks( $post_id );
+				}
 			} else {
-				$this->custom_permalinks_model->delete_language_permalinks( $post_id );
+				update_post_meta( $post_id, 'custom_permalink', $permalink );
+				if ( null !== $language_code ) {
+					update_post_meta( $post_id, 'custom_permalink_language', $language_code );
+				} else {
+					delete_metadata( 'post', $post_id, 'custom_permalink_language' );
+				}
 			}
 		}
+	}
+
+	/**
+	 * Delete Post Permalink.
+	 *
+	 * @access public
+	 *
+	 * @param int $post_id Post ID.
+	 *
+	 * @return void
+	 */
+	public function delete_permalink( $post_id ) {
+		delete_metadata( 'post', $post_id, 'custom_permalink' );
 	}
 
 	/**
@@ -430,7 +458,11 @@ class Custom_Permalinks_Form {
 	 */
 	private function get_permalink_html( $post, $meta_box = false ) {
 		$post_id   = $post->ID;
-		$permalink = $this->custom_permalinks_model->get_permalink($post_id);
+		if ( defined('CUSTOM_PERMALINKS_FORK_ENABLED') && CUSTOM_PERMALINKS_FORK_ENABLED ) {
+			$permalink = $this->custom_permalinks_model->get_permalink($post_id);
+		} else {
+			$permalink = get_post_meta( $post_id, 'custom_permalink', true );
+		}
 
 		ob_start();
 
@@ -883,7 +915,15 @@ class Custom_Permalinks_Form {
 		if ( isset( $data['id'] ) && is_numeric( $data['id'] ) ) {
 			$post                               = get_post( $data['id'] );
 			$all_permalinks                     = array();
-			$all_permalinks['custom_permalink'] = $this->custom_permalinks_model->get_permalink($data['id']);
+			if ( defined('CUSTOM_PERMALINKS_FORK_ENABLED') && CUSTOM_PERMALINKS_FORK_ENABLED ) {
+				$all_permalinks['custom_permalink'] = $this->custom_permalinks_model->get_permalink($data['id']);
+			} else {
+				$all_permalinks['custom_permalink'] = get_post_meta(
+					$data['id'],
+					'custom_permalink',
+					true
+				);
+			}
 
 			if ( ! $all_permalinks['custom_permalink'] ) {
 				if ( 'draft' === $post->post_status
@@ -967,7 +1007,11 @@ class Custom_Permalinks_Form {
 	 */
 	public function static_homepage( $prev_homepage_id, $new_homepage_id ) {
 		if ( $prev_homepage_id !== $new_homepage_id ) {
-			$this->custom_permalinks_model->delete_permalink($new_homepage_id);
+			if ( defined('CUSTOM_PERMALINKS_FORK_ENABLED') && CUSTOM_PERMALINKS_FORK_ENABLED ) {
+				$this->custom_permalinks_model->delete_permalink($new_homepage_id);
+			} else {
+				$this->delete_permalink( $new_homepage_id );
+			}
 		}
 	}
 }
