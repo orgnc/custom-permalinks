@@ -167,38 +167,72 @@ class Custom_Permalinks_Frontend {
 
 		if ( ! $posts ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-			$posts = $wpdb->get_results(
-				$wpdb->prepare(
-					'SELECT p.ID, pm.meta_value, p.post_type, p.post_status ' .
-					" FROM $wpdb->posts AS p INNER JOIN {$this->custom_permalinks_model->table_name} AS pm ON (pm.post_id = p.ID) " .
-					" WHERE pm.language_code = '' " .
-					' AND (pm.meta_value = %s OR pm.meta_value = %s) ' .
-					" AND p.post_status != 'trash' AND p.post_type != 'nav_menu_item' " .
-					" ORDER BY FIELD(post_status,'publish','private','pending','draft','auto-draft','inherit')," .
-					" FIELD(post_type,'post','page') LIMIT 1",
-					$requested_url,
-					$requested_url . '/'
-				)
-			);
-
-			$remove_like_query = apply_filters( 'cp_remove_like_query', '__true' );
-			if ( ! $posts && '__true' === $remove_like_query ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			if ( getenv( 'CUSTOM_PERMALINKS_FORK_ENABLED' ) ) {
 				$posts = $wpdb->get_results(
 					$wpdb->prepare(
-						"SELECT p.ID, pm.meta_value, p.post_type, p.post_status FROM $wpdb->posts AS p " .
-						" LEFT JOIN {$this->custom_permalinks_model->table_name} AS pm ON (p.ID = pm.post_id) WHERE " .
-						" language_code = '' AND meta_value != '' AND " .
-						' ( LOWER(meta_value) = LEFT(LOWER(%s), LENGTH(meta_value)) OR ' .
-						'   LOWER(meta_value) = LEFT(LOWER(%s), LENGTH(meta_value)) ) ' .
-						"  WHERE post_status != 'trash' AND post_type != 'nav_menu_item'" .
-						' ORDER BY LENGTH(meta_value) DESC, ' .
-						" FIELD(post_status,'publish','private','pending','draft','auto-draft','inherit')," .
-						" FIELD(post_type,'post','page'), p.ID ASC LIMIT 1",
+						'SELECT p.ID, pm.meta_value, p.post_type, p.post_status ' .
+						" FROM $wpdb->posts AS p INNER JOIN {$this->custom_permalinks_model->table_name} AS pm ON (pm.post_id = p.ID) " .
+						" WHERE pm.language_code = '' " .
+						' AND (pm.meta_value = %s OR pm.meta_value = %s) ' .
+						" AND p.post_status != 'trash' AND p.post_type != 'nav_menu_item' " .
+						" ORDER BY FIELD(post_status,'publish','private','pending','draft','auto-draft','inherit')," .
+						" FIELD(post_type,'post','page') LIMIT 1",
 						$requested_url,
 						$requested_url . '/'
 					)
 				);
+			} else {
+				$posts = $wpdb->get_results(
+					$wpdb->prepare(
+						'SELECT p.ID, pm.meta_value, p.post_type, p.post_status ' .
+						" FROM $wpdb->posts AS p INNER JOIN $wpdb->postmeta AS pm ON (pm.post_id = p.ID) " .
+						" WHERE pm.meta_key = 'custom_permalink' " .
+						' AND (pm.meta_value = %s OR pm.meta_value = %s) ' .
+						" AND p.post_status != 'trash' AND p.post_type != 'nav_menu_item' " .
+						" ORDER BY FIELD(post_status,'publish','private','pending','draft','auto-draft','inherit')," .
+						" FIELD(post_type,'post','page') LIMIT 1",
+						$requested_url,
+						$requested_url . '/'
+					)
+				);
+			}
+
+			$remove_like_query = apply_filters( 'cp_remove_like_query', '__true' );
+			if ( ! $posts && '__true' === $remove_like_query ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+				if ( getenv( 'CUSTOM_PERMALINKS_FORK_ENABLED' ) ) {
+					$posts = $wpdb->get_results(
+						$wpdb->prepare(
+							"SELECT p.ID, pm.meta_value, p.post_type, p.post_status FROM $wpdb->posts AS p " .
+							" LEFT JOIN {$this->custom_permalinks_model->table_name} AS pm ON (p.ID = pm.post_id) WHERE " .
+							" language_code = '' AND meta_value != '' AND " .
+							' ( LOWER(meta_value) = LEFT(LOWER(%s), LENGTH(meta_value)) OR ' .
+							'   LOWER(meta_value) = LEFT(LOWER(%s), LENGTH(meta_value)) ) ' .
+							"  WHERE post_status != 'trash' AND post_type != 'nav_menu_item'" .
+							' ORDER BY LENGTH(meta_value) DESC, ' .
+							" FIELD(post_status,'publish','private','pending','draft','auto-draft','inherit')," .
+							" FIELD(post_type,'post','page'), p.ID ASC LIMIT 1",
+							$requested_url,
+							$requested_url . '/'
+						)
+					);
+				} else {
+					$posts = $wpdb->get_results(
+						$wpdb->prepare(
+							"SELECT p.ID, pm.meta_value, p.post_type, p.post_status FROM $wpdb->posts AS p " .
+							" LEFT JOIN $wpdb->postmeta AS pm ON (p.ID = pm.post_id) WHERE " .
+							" meta_key = 'custom_permalink' AND meta_value != '' AND " .
+							' ( LOWER(meta_value) = LEFT(LOWER(%s), LENGTH(meta_value)) OR ' .
+							'   LOWER(meta_value) = LEFT(LOWER(%s), LENGTH(meta_value)) ) ' .
+							"  AND post_status != 'trash' AND post_type != 'nav_menu_item'" .
+							' ORDER BY LENGTH(meta_value) DESC, ' .
+							" FIELD(post_status,'publish','private','pending','draft','auto-draft','inherit')," .
+							" FIELD(post_type,'post','page'), p.ID ASC LIMIT 1",
+							$requested_url,
+							$requested_url . '/'
+						)
+					);
+				}
 			}
 
 			wp_cache_set( $cache_name, $posts, 'custom_permalinks' );
@@ -232,20 +266,56 @@ class Custom_Permalinks_Frontend {
 
 		if ( ! $matched_post ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-			$matched_post = $wpdb->get_results(
-				$wpdb->prepare(
-					'SELECT p.ID, pm.meta_value, p.post_type, p.post_status ' .
-					" FROM $wpdb->posts AS p INNER JOIN {$this->custom_permalinks_model->table_name} AS pm ON (pm.post_id = p.ID) " .
-					" WHERE pm.language_code = %s " .
-					' AND (pm.meta_value = %s OR pm.meta_value = %s) ' .
-					" AND p.post_status != 'trash' AND p.post_type != 'nav_menu_item' " .
-					" ORDER BY FIELD(post_status,'publish','private','pending','draft','auto-draft','inherit')," .
-					" FIELD(post_type,'post','page')",
-					$language_code,
-					$requested_url,
-					$requested_url . '/'
-				)
-			);
+			if ( getenv( 'CUSTOM_PERMALINKS_FORK_ENABLED' ) ) {
+				$matched_post = $wpdb->get_results(
+					$wpdb->prepare(
+						'SELECT p.ID, pm.meta_value, p.post_type, p.post_status ' .
+						" FROM $wpdb->posts AS p INNER JOIN {$this->custom_permalinks_model->table_name} AS pm ON (pm.post_id = p.ID) " .
+						" WHERE pm.language_code = %s " .
+						' AND (pm.meta_value = %s OR pm.meta_value = %s) ' .
+						" AND p.post_status != 'trash' AND p.post_type != 'nav_menu_item' " .
+						" ORDER BY FIELD(post_status,'publish','private','pending','draft','auto-draft','inherit')," .
+						" FIELD(post_type,'post','page')",
+						$language_code,
+						$requested_url,
+						$requested_url . '/'
+					)
+				);
+			} else {
+				$posts = $wpdb->get_results(
+					$wpdb->prepare(
+						'SELECT p.ID, pm.meta_value, p.post_type, p.post_status ' .
+						" FROM $wpdb->posts AS p INNER JOIN $wpdb->postmeta AS pm ON (pm.post_id = p.ID) " .
+						" WHERE pm.meta_key = 'custom_permalink' " .
+						' AND (pm.meta_value = %s OR pm.meta_value = %s) ' .
+						" AND p.post_status != 'trash' AND p.post_type != 'nav_menu_item' " .
+						" ORDER BY FIELD(post_status,'publish','private','pending','draft','auto-draft','inherit')," .
+						" FIELD(post_type,'post','page')",
+						$requested_url,
+						$requested_url . '/'
+					)
+				);
+
+				if ( ! empty( $posts ) ) {
+					foreach ( $posts as $check_data ) {
+						// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+						$post_lang = $wpdb->get_row(
+							$wpdb->prepare(
+								"SELECT * FROM $wpdb->postmeta AS pm " .
+								" WHERE pm.meta_key = 'custom_permalink_language' " .
+								' AND pm.post_id = %d AND pm.meta_value = %s',
+								$check_data->ID,
+								$language_code
+							)
+						);
+
+						if ( $post_lang ) {
+							$matched_post[] = $check_data;
+							break;
+						}
+					}
+				}
+			}
 		}
 
 		wp_cache_set( $cache_name, $matched_post, 'custom_permalinks' );
@@ -689,7 +759,15 @@ class Custom_Permalinks_Frontend {
 			 */
 			if ( ( is_single() || is_page() ) && ! empty( $wp_query->post ) ) {
 				$post             = $wp_query->post;
-				$custom_permalink = $this->custom_permalinks_model->get_permalink($post->ID);
+				if ( getenv( 'CUSTOM_PERMALINKS_FORK_ENABLED' ) ) {
+					$custom_permalink = $this->custom_permalinks_model->get_permalink($post->ID);
+				} else {
+					$custom_permalink = get_post_meta(
+						$post->ID,
+						'custom_permalink',
+						true
+					);
+				}
 				if ( 'page' === $post->post_type ) {
 					$original_permalink = $this->original_page_link( $post->ID );
 				} else {
@@ -755,7 +833,11 @@ class Custom_Permalinks_Frontend {
 	 * @return string customized Post Permalink.
 	 */
 	public function custom_post_link( $permalink, $post ) {
-		$custom_permalink = $this->custom_permalinks_model->get_permalink($post->ID);
+		if ( getenv( 'CUSTOM_PERMALINKS_FORK_ENABLED' ) ) {
+			$custom_permalink = $this->custom_permalinks_model->get_permalink($post->ID);
+		} else {
+			$custom_permalink = get_post_meta( $post->ID, 'custom_permalink', true );
+		}
 		if ( $custom_permalink ) {
 			$post_type = 'post';
 			if ( isset( $post->post_type ) ) {
@@ -810,7 +892,11 @@ class Custom_Permalinks_Frontend {
 	 * @return string customized Page Permalink.
 	 */
 	public function custom_page_link( $permalink, $page ) {
-		$custom_permalink = $this->custom_permalinks_model->get_permalink($page);
+		if ( getenv( 'CUSTOM_PERMALINKS_FORK_ENABLED' ) ) {
+			$custom_permalink = $this->custom_permalinks_model->get_permalink($page);
+		} else {
+			$custom_permalink = get_post_meta( $page, 'custom_permalink', true );
+		}
 		if ( $custom_permalink ) {
 			$language_code = apply_filters(
 				'wpml_element_language_code',
