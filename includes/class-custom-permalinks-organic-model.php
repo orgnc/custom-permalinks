@@ -20,12 +20,16 @@ class Custom_Permalinks_Model
 	}
 
 	public function get_permalink( $post_id ) {
-		return $this->wpdb->get_var(
-			$this->wpdb->prepare(
-				"select meta_value from $this->table_name where post_id = %d",
-				$post_id
-			)
-		);
+		if ( getenv( 'CUSTOM_PERMALINKS_FORK_ENABLED' ) ) {
+			return $this->wpdb->get_var(
+				$this->wpdb->prepare(
+					"select meta_value from $this->table_name where post_id = %d",
+					$post_id
+				)
+			);
+		} else {
+			return get_post_meta( $post_id, 'custom_permalink', true );
+		}
 	}
 
 	public function get_permalink_by_url( $url ) {
@@ -42,18 +46,22 @@ class Custom_Permalinks_Model
 	}
 
 	public function update_permalink( $post_id, $permalink, $language_code = null ) {
-		return $this->wpdb->query(
-			$this->wpdb->prepare(
-				"insert into $this->table_name (meta_value, post_id, language_code) values (%s, %d, %s)
-					on duplicate key update meta_value = %s, post_id = %d, language_code = %s",
-				$permalink,
-				$post_id,
-				$language_code,
-				$permalink,
-				$post_id,
-				$language_code
-			)
-		);
+		if ( getenv( 'CUSTOM_PERMALINKS_FORK_ENABLED' ) ) {
+			return $this->wpdb->query(
+				$this->wpdb->prepare(
+					"insert into $this->table_name (meta_value, post_id, language_code) values (%s, %d, %s)
+                        on duplicate key update meta_value = %s, post_id = %d, language_code = %s",
+					$permalink,
+					$post_id,
+					$language_code,
+					$permalink,
+					$post_id,
+					$language_code
+				)
+			);
+		} else {
+			return update_post_meta( $post_id, 'custom_permalink', $permalink );
+		}
 	}
 
 	public function delete_language_permalinks( $post_id ) {
